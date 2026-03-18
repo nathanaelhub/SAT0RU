@@ -168,9 +168,92 @@
         } else return { x: 0, y: 0, z: 0, r: 0, g: 0, b: 0, s: 0 };
     }
 
+    function getJudgmentCharge(i) {
+        const total = COUNT;
+        if (i < total * 0.15) {
+            // Bright white-hot core — undecided energy
+            const r = Math.random() * 8;
+            const theta = Math.random() * 6.28; const phi = Math.acos(2 * Math.random() - 1);
+            return { x: r*Math.sin(phi)*Math.cos(theta), y: r*Math.sin(phi)*Math.sin(theta), z: r*Math.cos(phi), r: 2, g: 2, b: 2, s: 2.5 };
+        } else if (i < total * 0.35) {
+            // Expanding shockwave ring
+            const angle = Math.random() * Math.PI * 2;
+            const r = 20 + Math.random() * 5;
+            return { x: r * Math.cos(angle), y: (Math.random()-0.5)*2, z: r * Math.sin(angle), r: 0.8, g: 0.5, b: 1.0, s: 1.8 };
+        } else if (i < total * 0.55) {
+            // Upper hemisphere — gold hints (salvation potential)
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.random() * Math.PI * 0.5;
+            const r = 10 + Math.random() * 25;
+            return { x: r*Math.sin(phi)*Math.cos(theta), y: r*Math.cos(phi), z: r*Math.sin(phi)*Math.sin(theta), r: 0.6, g: 0.45, b: 0.1, s: 0.7 };
+        } else if (i < total * 0.75) {
+            // Lower hemisphere — crimson hints (damnation potential)
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.random() * Math.PI * 0.5;
+            const r = 10 + Math.random() * 25;
+            return { x: r*Math.sin(phi)*Math.cos(theta), y: -r*Math.cos(phi), z: r*Math.sin(phi)*Math.sin(theta), r: 0.5, g: 0.02, b: 0.02, s: 0.7 };
+        } else {
+            return { x: 0, y: 0, z: 0, r: 0, g: 0, b: 0, s: 0 };
+        }
+    }
+
+    function getJudgmentUp(i) {
+        const total = COUNT;
+        if (i < total * 0.12) {
+            // Halo ring crowning the top
+            const angle = Math.random() * Math.PI * 2;
+            const r = 18 + Math.random() * 2;
+            return { x: r * Math.cos(angle), y: 20 + (Math.random()-0.5)*1, z: r * Math.sin(angle), r: 1.0, g: 0.85, b: 0.3, s: 2.5 };
+        } else if (i < total * 0.35) {
+            // Rising light pillars
+            const angle = (i % 6) * (Math.PI / 3);
+            const rad = 8 + Math.random() * 3;
+            const h = Math.random() * 50 - 15;
+            return { x: rad * Math.cos(angle) + (Math.random()-0.5)*3, y: h, z: rad * Math.sin(angle) + (Math.random()-0.5)*3, r: 1.0, g: 0.9, b: 0.6, s: 1.5 };
+        } else if (i < total * 0.65) {
+            // Radiating golden starburst
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const r = 5 + Math.random() * 35;
+            return { x: r * Math.sin(phi) * Math.cos(theta), y: r * Math.sin(phi) * Math.sin(theta) + 5, z: r * Math.cos(phi), r: 1.0, g: 0.75, b: 0.2, s: 0.9 };
+        } else {
+            // Ambient golden sparkles
+            return { x: (Math.random()-0.5)*60, y: Math.random()*40 - 10, z: (Math.random()-0.5)*60, r: 0.8, g: 0.6, b: 0.1, s: 0.5 };
+        }
+    }
+
+    function getJudgmentDown(i) {
+        const total = COUNT;
+        if (i < total * 0.2) {
+            // Cracked ground plane
+            const angle = Math.random() * Math.PI * 2;
+            const r = Math.random() * 40;
+            return { x: r * Math.cos(angle), y: -18 + (Math.random()-0.5)*3, z: r * Math.sin(angle), r: 0.5, g: 0.05, b: 0.05, s: 0.9 };
+        } else if (i < total * 0.4) {
+            // Descending vortex funnel
+            const t = i / total;
+            const angle = t * 20;
+            const r = (1 - t) * 30;
+            const y = -t * 40 + 15;
+            return { x: r * Math.cos(angle), y: y, z: r * Math.sin(angle), r: 0.6, g: 0, b: 0.1, s: 1.2 };
+        } else if (i < total * 0.65) {
+            // Dark fire particles
+            const theta = Math.random() * Math.PI * 2;
+            const r = Math.random() * 25;
+            const y = -Math.random() * 30;
+            return { x: r * Math.cos(theta), y: y, z: r * Math.sin(theta), r: 0.7, g: 0.1, b: 0, s: 1.0 };
+        } else {
+            // Void
+            return { x: 0, y: 0, z: 0, r: 0, g: 0, b: 0, s: 0 };
+        }
+    }
+
     // Hand Tracking
     let currentTech = 'neutral';
     let shakeIntensity = 0;
+    let pendingTech = 'neutral';
+    let pendingCount = 0;
+    const DEBOUNCE = 4; // frames a gesture must hold before switching
     const videoElement = document.querySelector('.input_video');
     const canvasElement = document.getElementById('output_canvas');
     const canvasCtx = canvasElement.getContext('2d');
@@ -184,20 +267,48 @@
         let detected = 'neutral';
 
         if (results.multiHandLandmarks) {
+            let openHandCount = 0;
+
             results.multiHandLandmarks.forEach((lm) => {
                 drawConnectors(canvasCtx, lm, HAND_CONNECTIONS, {color: glowColor, lineWidth: 5});
                 drawLandmarks(canvasCtx, lm, {color: '#fff', lineWidth: 1, radius: 2});
 
                 const isUp = (t, p) => lm[t].y < lm[p].y;
                 const pinch = Math.hypot(lm[8].x - lm[4].x, lm[8].y - lm[4].y);
-                
+
+                const fist = !isUp(8,6) && !isUp(12,10) && !isUp(16,14) && !isUp(20,18);
+                const allUp = isUp(8,6) && isUp(12,10) && isUp(16,14) && isUp(20,18);
+                const thumbV = lm[4].y - lm[3].y;
+
+                // Crossed fingers: index & middle tips swap x-position relative to their base joints
+                const normalOrder = lm[9].x - lm[5].x; // middle MCP vs index MCP
+                const tipOrder = lm[12].x - lm[8].x;   // middle tip vs index tip
+                const crossed = isUp(8,6) && isUp(12,10) && !isUp(16,14) && (normalOrder * tipOrder) < 0;
+
+                if (allUp) openHandCount++;
+
                 if (pinch < 0.04) detected = 'purple';
-                else if (isUp(8,6) && isUp(12,10) && isUp(16,14) && isUp(20,18)) detected = 'shrine';
-                else if (isUp(8,6) && isUp(12,10) && !isUp(16,14)) detected = 'void';
+                else if (fist && thumbV < -0.05) detected = 'judgmentUp';
+                else if (fist && thumbV > 0.05) detected = 'judgmentDown';
+                else if (fist) detected = 'judgmentCharge';
+                else if (crossed) detected = 'void';
                 else if (isUp(8,6) && !isUp(12,10)) detected = 'red';
             });
+
+            // Shrine requires both hands open (prayer gesture)
+            if (openHandCount >= 2) detected = 'shrine';
         }
-        updateState(detected);
+
+        // Debounce: require gesture to hold for several frames before switching
+        if (detected === pendingTech) {
+            pendingCount++;
+        } else {
+            pendingTech = detected;
+            pendingCount = 1;
+        }
+        if (pendingCount >= DEBOUNCE) {
+            updateState(detected);
+        }
     });
 
     function updateState(tech) {
@@ -210,6 +321,9 @@
         else if(tech === 'purple') { glowColor = '#bb00ff'; nameEl.innerText = "Secret Technique: Hollow Purple"; bloomPass.strength = 4.0; }
         else if(tech === 'void') { glowColor = '#00ffff'; nameEl.innerText = "Domain Expansion: Infinite Void"; bloomPass.strength = 2.0; }
         else if(tech === 'red') { glowColor = '#ff3333'; nameEl.innerText = "Reverse Cursed Technique: Red"; bloomPass.strength = 2.5; }
+        else if(tech === 'judgmentCharge') { glowColor = '#c0a0ff'; nameEl.innerText = "Domain Expansion: Judgment"; bloomPass.strength = 2.5; }
+        else if(tech === 'judgmentUp') { glowColor = '#ffd700'; nameEl.innerText = "Judgment: Absolution"; bloomPass.strength = 3.0; }
+        else if(tech === 'judgmentDown') { glowColor = '#8b0000'; nameEl.innerText = "Judgment: Damnation"; bloomPass.strength = 2.0; }
         else { glowColor = '#00ffff'; nameEl.innerText = "Neutral State"; bloomPass.strength = 1.0; }
 
         for(let i=0; i<COUNT; i++) {
@@ -224,6 +338,9 @@
             else if(tech === 'void') p = getVoid(i);
             else if(tech === 'purple') p = getPurple(i);
             else if(tech === 'shrine') p = getShrine(i);
+            else if(tech === 'judgmentCharge') p = getJudgmentCharge(i);
+            else if(tech === 'judgmentUp') p = getJudgmentUp(i);
+            else if(tech === 'judgmentDown') p = getJudgmentDown(i);
             
             targetPositions[i*3] = p.x; targetPositions[i*3+1] = p.y; targetPositions[i*3+2] = p.z;
             targetColors[i*3] = p.r; targetColors[i*3+1] = p.g; targetColors[i*3+2] = p.b;
@@ -272,7 +389,15 @@
             particles.rotation.y += 0.05;
         } else if (currentTech === 'shrine') {
             // FORCE UPRIGHT: Reset and freeze all rotations
-            particles.rotation.set(0, 0, 0); 
+            particles.rotation.set(0, 0, 0);
+        } else if (currentTech === 'judgmentCharge') {
+            particles.rotation.y += 0.03;
+            particles.rotation.x += 0.01;
+        } else if (currentTech === 'judgmentUp') {
+            particles.rotation.y += 0.008;
+            particles.rotation.x *= 0.95; // settle upright from charge spin
+        } else if (currentTech === 'judgmentDown') {
+            particles.rotation.y -= 0.015;
         } else {
             // Default Neutral rotation
             particles.rotation.y += 0.005;
